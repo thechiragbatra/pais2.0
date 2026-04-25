@@ -568,6 +568,21 @@ def notifications_page():
 
 
 # ---------------------------------------------------------------------------
+# DSA Engine — standalone tools (no model dependency, pure UI / algorithms)
+# ---------------------------------------------------------------------------
+@app.route("/grade-calculator")
+def grade_calculator():
+    """Standalone UPES grade calculator — pure client-side math."""
+    return render_template("grade_calculator.html")
+
+
+@app.route("/dsa-visualizer")
+def dsa_visualizer():
+    """Interactive visualisations of the four DSA algorithms used in PAIS."""
+    return render_template("dsa_visualizer.html")
+
+
+# ---------------------------------------------------------------------------
 # JSON API
 # ---------------------------------------------------------------------------
 @app.route("/api/students")

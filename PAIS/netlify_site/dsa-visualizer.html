@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSA Engine Visualizer — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+
+  <style>
+    /* ---------- Algorithm tabs (top) ---------- */
+    .algo-tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .algo-tab {
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      border: none;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .algo-tab:hover { color: var(--ink); }
+    .algo-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .algo-panel { display: none; }
+    .algo-panel.active { display: block; }
+
+    /* ---------- Layout shared by algorithms ---------- */
+    .algo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 22px;
+    }
+    @media (max-width: 1080px) {
+      .algo-grid { grid-template-columns: 1fr; }
+    }
+
+    .algo-controls {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      padding-top: 14px; margin-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    /* ---------- Step counter ---------- */
+    .step-info {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--ink-muted);
+      margin-bottom: 8px;
+    }
+    .step-info b { color: var(--ink); }
+    .step-narration {
+      padding: 10px 14px;
+      background: var(--accent-soft);
+      border-left: 3px solid var(--accent);
+      font-size: 13px;
+      color: var(--accent);
+      border-radius: 0 4px 4px 0;
+      min-height: 42px;
+      transition: background 0.2s;
+    }
+    .step-narration.warn { background: #fff4e0; border-left-color: var(--risk-high); color: var(--risk-high); }
+    .step-narration.success { background: #dde8e0; border-left-color: var(--risk-safe); color: var(--risk-safe); }
+
+    /* ---------- Sliding Window visualisation ---------- */
+    .window-strip {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .day-cell {
+      width: 28px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 11px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--bg-panel);
+      transition: all 0.25s;
+      position: relative;
+    }
+    .day-cell.absent { background: #f7e7d8; color: var(--risk-high); }
+    .day-cell.present { background: #e4ecde; color: var(--risk-safe); }
+    .day-cell.in-window {
+      box-shadow: 0 0 0 2px var(--accent), 0 1px 3px rgba(30,58,95,0.25);
+      transform: translateY(-2px);
+      z-index: 1;
+    }
+    .day-cell.flagged {
+      background: var(--risk-critical); color: #fff;
+      border-color: var(--risk-critical);
+    }
+    .day-label {
+      font-size: 9px; color: var(--ink-muted);
+      text-align: center; margin-top: 3px;
+    }
+
+    .window-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; margin-top: 14px;
+    }
+    .stat-tile {
+      padding: 10px 14px;
+      background: var(--bg-subtle);
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+    }
+    .stat-tile-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+    .stat-tile-value { font-family: var(--font-mono); font-size: 18px; margin-top: 4px; }
+
+    /* ---------- Priority Queue (heap) ---------- */
+    .heap-tree {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 26px;
+      padding: 20px 10px 30px;
+      min-height: 240px;
+    }
+    .heap-level {
+      display: flex; gap: 16px; justify-content: center;
+      flex-wrap: nowrap;
+    }
+    .heap-node {
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--bg-panel);
+      border: 2px solid var(--line-strong);
+      font-family: var(--font-mono); font-size: 11px;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .heap-node b {
+      font-family: var(--font-display); font-size: 16px;
+      font-weight: 600;
+    }
+    .heap-node small { color: var(--ink-muted); font-size: 9px; }
+    .heap-node.swapping {
+      background: var(--risk-high); color: #fff; border-color: var(--risk-high);
+      transform: scale(1.12);
+    }
+    .heap-node.new {
+      background: var(--risk-safe); color: #fff; border-color: var(--risk-safe);
+      animation: pulse 0.6s;
+    }
+    .heap-node.popped {
+      background: var(--risk-critical); color: #fff; border-color: var(--risk-critical);
+      animation: pulse 0.6s;
+    }
+    @keyframes pulse {
+      0%   { transform: scale(0.5); }
+      60%  { transform: scale(1.18); }
+      100% { transform: scale(1); }
+    }
+
+    .heap-array {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .array-cell {
+      width: 50px; height: 38px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 12px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--bg-panel);
+      transition: all 0.25s;
+    }
+    .array-cell.active {
+      border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);
+      background: var(--accent-soft);
+    }
+
+    /* ---------- Hash Map ---------- */
+    .hash-buckets {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 6px 14px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .bucket-label {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--ink-muted); text-align: right;
+    }
+    .bucket-row {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      min-height: 32px; padding: 4px;
+      background: var(--bg-subtle);
+      border-radius: 3px;
+      transition: background 0.25s;
+    }
+    .bucket-row.active { background: var(--accent-soft); }
+    .bucket-row.found  { background: #dde8e0; }
+    .bucket-pill {
+      padding: 3px 9px;
+      background: var(--bg-panel);
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      font-family: var(--font-mono); font-size: 11px;
+      transition: all 0.25s;
+    }
+    .bucket-pill.target {
+      background: var(--risk-safe); color: #fff;
+      border-color: var(--risk-safe);
+      transform: scale(1.08);
+    }
+
+    .hash-input-row {
+      display: flex; gap: 8px; align-items: center; margin-top: 12px;
+    }
+    .hash-input-row input {
+      width: 140px; padding: 6px 10px;
+      font-family: var(--font-mono); font-size: 13px;
+      border: 1px solid var(--line-strong); border-radius: var(--radius);
+    }
+    .hash-equation {
+      font-family: var(--font-mono); font-size: 12.5px;
+      padding: 10px 14px;
+      background: var(--bg-subtle);
+      border-radius: var(--radius);
+      margin-top: 12px;
+      border: 1px solid var(--line);
+    }
+    .hash-equation .em { color: var(--accent); font-weight: 500; }
+    .hash-equation .res { color: var(--risk-safe); font-weight: 500; }
+
+    /* ---------- Greedy ---------- */
+    .greedy-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 80px;
+      gap: 12px; align-items: center;
+      padding: 8px 0; font-size: 13px;
+      border-bottom: 1px dashed var(--line);
+    }
+    .greedy-row:last-child { border-bottom: none; }
+    .greedy-bar-track {
+      height: 18px; background: var(--bg-subtle);
+      border-radius: 3px; overflow: hidden; position: relative;
+    }
+    .greedy-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #2d5a8a);
+      transition: width 0.5s;
+    }
+    .greedy-bar-fill.cutoff {
+      background: linear-gradient(90deg, var(--risk-safe), #4a8060);
+    }
+    .greedy-bar-fill.impossible {
+      background: linear-gradient(90deg, var(--risk-critical), #b35454);
+    }
+    .greedy-marker {
+      position: absolute; top: -2px; bottom: -2px;
+      width: 2px; background: var(--risk-critical);
+    }
+    .greedy-stat {
+      font-family: var(--font-mono); font-size: 11.5px;
+      text-align: right; color: var(--ink-muted);
+    }
+    .greedy-stat.feasible { color: var(--risk-safe); }
+    .greedy-stat.impossible { color: var(--risk-critical); }
+    .greedy-grade-pill {
+      font-family: var(--font-display); font-weight: 600;
+      font-size: 16px; text-align: center;
+    }
+
+    /* ---------- Mini editable dataset ---------- */
+    .data-mini {
+      font-family: var(--font-mono); font-size: 12px;
+      width: 100%; min-height: 60px;
+      padding: 10px 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+      resize: vertical;
+    }
+    .data-mini:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    .data-help {
+      font-size: 11.5px; color: var(--ink-muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">DSA Engine</div>
+        <h1 class="page-title">Algorithm Visualizer</h1>
+        <p class="page-subtitle">
+          Interactive, step-by-step walkthroughs of the four core algorithms
+          powering PAIS. Edit the dataset, press Step, and watch the data
+          structures evolve.
+        </p>
+      </div>
+    </header>
+
+    <!-- Algorithm chooser -->
+    <div class="algo-tabs" id="algoTabs">
+      <button class="algo-tab active" data-tab="window">Sliding Window</button>
+      <button class="algo-tab" data-tab="heap">Priority Queue</button>
+      <button class="algo-tab" data-tab="hash">Hash Map Lookup</button>
+      <button class="algo-tab" data-tab="greedy">Greedy (Grade Calc)</button>
+    </div>
+
+    <!-- ========================================================================
+         Algorithm 1 — Sliding Window
+         ====================================================================== -->
+    <section class="algo-panel active" data-panel="window">
+      <div class="algo-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Dataset</div>
+              <div class="panel-sub">14-day attendance log · 1 = present, 0 = absent</div>
+            </div>
+          </div>
+          <textarea id="windowData" class="data-mini">1,1,1,0,0,0,0,1,0,1,1,0,0,1</textarea>
+          <div class="data-help">Comma-separated, only 0 or 1. Each cell = one day.</div>
+
+          <div style="margin-top: 16px;">
+            <label class="component-weight">Window size</label>
+            <input type="number" id="windowSize" value="5" min="2" max="14" step="1"
+                   class="component-input" style="width: 60px; margin-top: 4px;">
+          </div>
+
+          <div class="algo-controls">
+            <button class="btn btn-primary" id="windowStep">Step ▸</button>
+            <button class="btn" id="windowAuto">Auto-run</button>
+            <button class="btn" id="windowReset">Reset</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Visualisation</div>
+              <div class="panel-sub">Window slides one position per step · O(d) running sum</div>
+            </div>
+          </div>
+          <div class="step-info">Step <b id="windowStepNum">0</b> · Window <b id="windowRange">[0..0]</b></div>
+          <div class="step-narration" id="windowNarr">Press <b>Step ▸</b> to start. The algorithm slides a fixed-size window across the days, recomputing the mean attendance in O(1) by adjusting one in / one out.</div>
+
+          <div class="window-strip" id="windowStrip"></div>
+
+          <div class="window-stats">
+            <div class="stat-tile">
+              <div class="stat-tile-label">Mean attendance</div>
+              <div class="stat-tile-value" id="windowMean">—</div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile-label">Std dev</div>
+              <div class="stat-tile-value" id="windowStd">—</div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile-label">Anomalies flagged</div>
+              <div class="stat-tile-value" id="windowFlags">0</div>
+            </div>
+          </div>
+
+          <div class="small muted" style="margin-top: 12px;">
+            <strong>Rule:</strong> a window is flagged when <span class="mono">mean &lt; 0.5</span>
+            (i.e. attended &lt; 50% of days in window).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         Algorithm 2 — Priority Queue (max-heap)
+         ====================================================================== -->
+    <section class="algo-panel" data-panel="heap">
+      <div class="algo-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Dataset</div>
+              <div class="panel-sub">Risk scores to insert into a max-heap</div>
+            </div>
+          </div>
+          <textarea id="heapData" class="data-mini">0.42,0.78,0.31,0.91,0.55,0.18,0.69,0.84</textarea>
+          <div class="data-help">Comma-separated risk scores in [0, 1]. Top-K extraction reveals worst students.</div>
+
+          <div class="algo-controls">
+            <button class="btn btn-primary" id="heapPush">Push next ▸</button>
+            <button class="btn" id="heapPop">Pop max ▾</button>
+            <button class="btn" id="heapAuto">Auto-build</button>
+            <button class="btn" id="heapReset">Reset</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Heap state</div>
+              <div class="panel-sub">Tree view (top) · array layout (bottom) · O(log n) per op</div>
+            </div>
+          </div>
+          <div class="step-info">Heap size <b id="heapSize">0</b> · Operation <b id="heapOp">idle</b></div>
+          <div class="step-narration" id="heapNarr">Press <b>Push next ▸</b> to insert the next score. The element is appended at the end and "bubbled up" while it's larger than its parent.</div>
+
+          <div class="heap-tree" id="heapTree">
+            <div class="empty-state">Heap is empty.</div>
+          </div>
+
+          <div class="component-weight" style="margin-top: 14px;">Underlying array</div>
+          <div class="heap-array" id="heapArray"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         Algorithm 3 — Hash Map
+         ====================================================================== -->
+    <section class="algo-panel" data-panel="hash">
+      <div class="algo-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Dataset</div>
+              <div class="panel-sub">Student IDs to insert into the hash table</div>
+            </div>
+          </div>
+          <textarea id="hashData" class="data-mini">S1042,S2017,S3000,S1199,S2502,S1042,S4001,S3333,S1500</textarea>
+          <div class="data-help">Comma-separated IDs. Duplicates are overwritten (this is a map, not a multiset).</div>
+
+          <div class="hash-input-row">
+            <label class="component-weight">Lookup:</label>
+            <input type="text" id="hashLookupKey" placeholder="e.g. S1042">
+            <button class="btn btn-primary" id="hashLookupBtn">Look up</button>
+          </div>
+
+          <div class="algo-controls">
+            <button class="btn btn-primary" id="hashStep">Insert next ▸</button>
+            <button class="btn" id="hashAuto">Build all</button>
+            <button class="btn" id="hashReset">Reset</button>
+          </div>
+
+          <div class="small muted" style="margin-top: 12px;">
+            <strong>Bucket count:</strong> 8. Hash function: <span class="mono">sum(charCodes) mod 8</span>.
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Hash table state</div>
+              <div class="panel-sub">8 buckets · chaining for collisions · O(1) average lookup</div>
+            </div>
+          </div>
+          <div class="step-info">Inserted <b id="hashCount">0</b> keys · Last op <b id="hashOp">idle</b></div>
+          <div class="step-narration" id="hashNarr">Press <b>Insert next ▸</b> to hash the next ID. Watch the bucket index change as different keys collide into the same slot.</div>
+
+          <div class="hash-equation" id="hashEq">Awaiting first insert…</div>
+
+          <div class="hash-buckets" id="hashBuckets"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         Algorithm 4 — Greedy (Grade Calculator)
+         ====================================================================== -->
+    <section class="algo-panel" data-panel="greedy">
+      <div class="algo-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Current scores</div>
+              <div class="panel-sub">Earned marks → required End Sem for each grade target</div>
+            </div>
+          </div>
+
+          <div class="component-row">
+            <div class="component-name">Mid Sem (20%)</div>
+            <input type="number" id="g_mid" class="component-input" min="0" max="100" value="55">
+            <span class="out-of">/ 100</span>
+          </div>
+          <div class="component-row">
+            <div class="component-name">Quiz (20%)</div>
+            <input type="number" id="g_quiz" class="component-input" min="0" max="100" value="60">
+            <span class="out-of">/ 100</span>
+          </div>
+          <div class="component-row">
+            <div class="component-name">Tests (20%)</div>
+            <input type="number" id="g_tests" class="component-input" min="0" max="100" value="58">
+            <span class="out-of">/ 100</span>
+          </div>
+          <div class="component-row">
+            <div class="component-name">Class Perf (10%)</div>
+            <input type="number" id="g_class" class="component-input" min="0" max="100" value="70">
+            <span class="out-of">/ 100</span>
+          </div>
+
+          <div class="algo-controls">
+            <button class="btn btn-primary" id="greedyStep">Allocate next grade ▸</button>
+            <button class="btn" id="greedyAuto">Run all</button>
+            <button class="btn" id="greedyReset">Reset</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Greedy allocation</div>
+              <div class="panel-sub">Iterates highest-cutoff first · marks each target feasible / not</div>
+            </div>
+          </div>
+          <div class="step-info">Earned: <b id="greedyEarned">0</b> / 70 · Considering: <b id="greedyConsidering">—</b></div>
+          <div class="step-narration" id="greedyNarr">Press <b>Allocate next grade ▸</b>. The greedy algorithm walks through grade targets from highest to lowest, computing the minimum End Sem mark needed for each.</div>
+
+          <div id="greedyList" style="margin-top: 8px;"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script>
+/* ============================================================================
+   ALGORITHM 1 — Sliding Window
+   ----------------------------------------------------------------------------
+   Idea:
+     Slide a fixed-size window across a 1-D series. Maintain the running sum
+     by adding the entering element and subtracting the leaving one — this
+     keeps each step at O(1) instead of O(d).
+   ============================================================================ */
+const Window = (function () {
+  let data = [], size = 5, pos = 0, flagged = 0;
+
+  function parseData() {
+    const raw = document.getElementById('windowData').value;
+    data = raw.split(',').map(s => Number(s.trim()))
+              .filter(n => n === 0 || n === 1);
+    size = Math.max(2, Math.min(data.length, parseInt(document.getElementById('windowSize').value) || 5));
+  }
+
+  function reset() {
+    parseData();
+    pos = 0; flagged = 0;
+    document.getElementById('windowStepNum').textContent = '0';
+    document.getElementById('windowMean').textContent = '—';
+    document.getElementById('windowStd').textContent = '—';
+    document.getElementById('windowFlags').textContent = '0';
+    document.getElementById('windowNarr').className = 'step-narration';
+    document.getElementById('windowNarr').innerHTML =
+      `Loaded <b>${data.length}</b> days. Window size = <b>${size}</b>. Press <b>Step ▸</b> to begin.`;
+    render();
+  }
+
+  function step() {
+    if (pos > data.length - size) {
+      document.getElementById('windowNarr').className = 'step-narration success';
+      document.getElementById('windowNarr').innerHTML =
+        `Done. Scanned all windows · <b>${flagged}</b> anomaly window(s) flagged.`;
+      return;
+    }
+    const slice = data.slice(pos, pos + size);
+    const mean = slice.reduce((a, b) => a + b, 0) / size;
+    const variance = slice.reduce((s, x) => s + (x - mean) ** 2, 0) / size;
+    const std = Math.sqrt(variance);
+    const flag = mean < 0.5;
+    if (flag) flagged++;
+
+    document.getElementById('windowStepNum').textContent = pos + 1;
+    document.getElementById('windowRange').textContent = `[${pos}..${pos + size - 1}]`;
+    document.getElementById('windowMean').textContent = mean.toFixed(2);
+    document.getElementById('windowStd').textContent = std.toFixed(2);
+    document.getElementById('windowFlags').textContent = flagged;
+
+    const narr = document.getElementById('windowNarr');
+    if (flag) {
+      narr.className = 'step-narration warn';
+      narr.innerHTML = `Window <b>[${pos}..${pos + size - 1}]</b> · mean=<b>${mean.toFixed(2)}</b> < 0.5 → <b>flagged as attendance anomaly</b>.`;
+    } else {
+      narr.className = 'step-narration';
+      narr.innerHTML = `Window <b>[${pos}..${pos + size - 1}]</b> · mean=<b>${mean.toFixed(2)}</b> ≥ 0.5 → healthy.`;
+    }
+    render(flag);
+    pos++;
+  }
+
+  function render(flag = false) {
+    const strip = document.getElementById('windowStrip');
+    strip.innerHTML = data.map((v, i) => {
+      const inWin = i >= pos && i < pos + size;
+      const flaggedCell = flag && inWin;
+      const cls = [
+        'day-cell',
+        v === 1 ? 'present' : 'absent',
+        inWin ? 'in-window' : '',
+        flaggedCell ? 'flagged' : '',
+      ].filter(Boolean).join(' ');
+      return `<div class="${cls}">${v}</div>`;
+    }).join('');
+  }
+
+  let timer = null;
+  function auto() {
+    if (timer) { clearInterval(timer); timer = null; return; }
+    timer = setInterval(() => {
+      if (pos > data.length - size) { clearInterval(timer); timer = null; return; }
+      step();
+    }, 700);
+  }
+
+  document.getElementById('windowStep').onclick = step;
+  document.getElementById('windowAuto').onclick = auto;
+  document.getElementById('windowReset').onclick = reset;
+  document.getElementById('windowData').addEventListener('input', () => { if (timer) clearInterval(timer); reset(); });
+  document.getElementById('windowSize').addEventListener('input', () => { if (timer) clearInterval(timer); reset(); });
+
+  reset();
+  return { reset };
+})();
+
+/* ============================================================================
+   ALGORITHM 2 — Priority Queue (Max-Heap)
+   ----------------------------------------------------------------------------
+   Implementation: array-backed binary heap using neg_score so the maximum
+   element rises to the top. Mirrors src/dsa/priority_queue.py.
+     - Push: append at end, bubble up while parent is smaller.   O(log n)
+     - Pop:  remove root, swap with last, bubble down.           O(log n)
+   ============================================================================ */
+const Heap = (function () {
+  let scores = [], heap = [], pushIdx = 0, lastSwap = -1, lastNew = -1, lastPop = -1;
+
+  function parse() {
+    scores = document.getElementById('heapData').value
+      .split(',').map(s => Number(s.trim()))
+      .filter(n => Number.isFinite(n));
+  }
+
+  function reset() {
+    parse();
+    heap = []; pushIdx = 0;
+    lastSwap = -1; lastNew = -1; lastPop = -1;
+    document.getElementById('heapSize').textContent = '0';
+    document.getElementById('heapOp').textContent = 'idle';
+    document.getElementById('heapNarr').className = 'step-narration';
+    document.getElementById('heapNarr').innerHTML =
+      `Loaded <b>${scores.length}</b> scores. Press <b>Push next ▸</b> to insert one.`;
+    render();
+  }
+
+  function bubbleUp(i) {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (heap[i] > heap[parent]) {
+        [heap[i], heap[parent]] = [heap[parent], heap[i]];
+        i = parent;
+      } else break;
+    }
+    return i;
+  }
+
+  function bubbleDown(i) {
+    const n = heap.length;
+    while (true) {
+      const l = 2 * i + 1, r = 2 * i + 2;
+      let max = i;
+      if (l < n && heap[l] > heap[max]) max = l;
+      if (r < n && heap[r] > heap[max]) max = r;
+      if (max === i) break;
+      [heap[i], heap[max]] = [heap[max], heap[i]];
+      i = max;
+    }
+  }
+
+  function push() {
+    if (pushIdx >= scores.length) {
+      document.getElementById('heapNarr').className = 'step-narration success';
+      document.getElementById('heapNarr').innerHTML = 'All scores inserted. Try <b>Pop max ▾</b> to extract the highest-risk student.';
+      return;
+    }
+    const v = scores[pushIdx++];
+    heap.push(v);
+    lastNew = heap.length - 1;
+    const finalPos = bubbleUp(lastNew);
+    lastSwap = finalPos !== heap.length - 1 ? finalPos : -1;
+    lastPop = -1;
+    document.getElementById('heapSize').textContent = heap.length;
+    document.getElementById('heapOp').textContent = `push(${v.toFixed(2)})`;
+    document.getElementById('heapNarr').className = 'step-narration';
+    document.getElementById('heapNarr').innerHTML =
+      `Pushed <b>${v.toFixed(2)}</b>. Bubbled from index ${heap.length - 1} → <b>${finalPos}</b>.`;
+    render();
+  }
+
+  function pop() {
+    if (!heap.length) {
+      document.getElementById('heapNarr').className = 'step-narration warn';
+      document.getElementById('heapNarr').textContent = 'Heap is empty — push first.';
+      return;
+    }
+    const top = heap[0];
+    lastPop = 0;
+    if (heap.length === 1) heap = [];
+    else { heap[0] = heap.pop(); bubbleDown(0); }
+    lastNew = -1; lastSwap = -1;
+    document.getElementById('heapSize').textContent = heap.length;
+    document.getElementById('heapOp').textContent = `pop() → ${top.toFixed(2)}`;
+    document.getElementById('heapNarr').className = 'step-narration warn';
+    document.getElementById('heapNarr').innerHTML =
+      `Popped <b>${top.toFixed(2)}</b> (the maximum). Reheapified the remaining <b>${heap.length}</b> elements.`;
+    render();
+  }
+
+  function render() {
+    const arr = document.getElementById('heapArray');
+    arr.innerHTML = heap.map((v, i) =>
+      `<div class="array-cell ${i === 0 && heap.length ? 'active' : ''}">${v.toFixed(2)}</div>`
+    ).join('') || '<div class="muted small" style="padding: 6px 0;">Empty</div>';
+
+    const tree = document.getElementById('heapTree');
+    if (!heap.length) {
+      tree.innerHTML = '<div class="empty-state">Heap is empty.</div>';
+      return;
+    }
+    // Build levels of the binary heap
+    const levels = [];
+    let i = 0, lvl = 0;
+    while (i < heap.length) {
+      const count = 1 << lvl;
+      levels.push(heap.slice(i, i + count));
+      i += count; lvl++;
+    }
+    tree.innerHTML = levels.map((lvlArr, lvlIdx) => {
+      const startIdx = (1 << lvlIdx) - 1;
+      return `<div class="heap-level">${
+        lvlArr.map((v, j) => {
+          const arrIdx = startIdx + j;
+          let cls = 'heap-node';
+          if (arrIdx === lastSwap) cls += ' swapping';
+          else if (arrIdx === lastNew && lastSwap === -1) cls += ' new';
+          return `<div class="${cls}"><b>${v.toFixed(2)}</b><small>i=${arrIdx}</small></div>`;
+        }).join('')
+      }</div>`;
+    }).join('');
+  }
+
+  let timer = null;
+  function auto() {
+    if (timer) { clearInterval(timer); timer = null; return; }
+    timer = setInterval(() => {
+      if (pushIdx >= scores.length) { clearInterval(timer); timer = null; return; }
+      push();
+    }, 600);
+  }
+
+  document.getElementById('heapPush').onclick = push;
+  document.getElementById('heapPop').onclick = pop;
+  document.getElementById('heapAuto').onclick = auto;
+  document.getElementById('heapReset').onclick = reset;
+  document.getElementById('heapData').addEventListener('input', () => { if (timer) clearInterval(timer); reset(); });
+
+  reset();
+  return { reset };
+})();
+
+/* ============================================================================
+   ALGORITHM 3 — Hash Map (chaining)
+   ----------------------------------------------------------------------------
+   Bucket count is fixed at 8. Hash function: sum of char codes mod 8.
+   On collision, append into the same bucket's list.
+   ============================================================================ */
+const Hash = (function () {
+  const BUCKETS = 8;
+  let keys = [], idx = 0;
+  let table = Array.from({ length: BUCKETS }, () => []);
+
+  function parse() {
+    keys = document.getElementById('hashData').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  function hash(key) {
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h += key.charCodeAt(i);
+    return h % BUCKETS;
+  }
+
+  function reset() {
+    parse();
+    idx = 0;
+    table = Array.from({ length: BUCKETS }, () => []);
+    document.getElementById('hashCount').textContent = '0';
+    document.getElementById('hashOp').textContent = 'idle';
+    document.getElementById('hashEq').innerHTML = 'Awaiting first insert…';
+    document.getElementById('hashNarr').className = 'step-narration';
+    document.getElementById('hashNarr').innerHTML =
+      `Loaded <b>${keys.length}</b> keys. Press <b>Insert next ▸</b> to hash the first one.`;
+    render();
+  }
+
+  function insertNext() {
+    if (idx >= keys.length) {
+      document.getElementById('hashNarr').className = 'step-narration success';
+      document.getElementById('hashNarr').innerHTML =
+        `All <b>${keys.length}</b> keys inserted. Try a lookup on the left.`;
+      return;
+    }
+    const key = keys[idx++];
+    const codes = [...key].map(c => c.charCodeAt(0));
+    const sum = codes.reduce((a, b) => a + b, 0);
+    const bucket = sum % BUCKETS;
+
+    // Insert with overwrite if key already there
+    const existing = table[bucket].findIndex(k => k === key);
+    if (existing >= 0) {
+      // already present — no-op insert (still highlight)
+    } else {
+      table[bucket].push(key);
+    }
+
+    document.getElementById('hashCount').textContent = idx;
+    document.getElementById('hashOp').textContent = `insert("${key}")`;
+    document.getElementById('hashEq').innerHTML =
+      `hash("<span class="em">${key}</span>") = (${codes.join(' + ')}) mod ${BUCKETS} = <span class="em">${sum}</span> mod ${BUCKETS} = <span class="res">${bucket}</span>`;
+    document.getElementById('hashNarr').className = 'step-narration';
+    document.getElementById('hashNarr').innerHTML =
+      existing >= 0
+        ? `Key <b>${key}</b> already present in bucket ${bucket} — overwrite (no change).`
+        : `Inserted <b>${key}</b> into bucket <b>${bucket}</b>${table[bucket].length > 1 ? ' (collision — chained)' : ''}.`;
+    render(bucket);
+  }
+
+  function lookup() {
+    const key = document.getElementById('hashLookupKey').value.trim();
+    if (!key) return;
+    const sum = [...key].reduce((s, c) => s + c.charCodeAt(0), 0);
+    const bucket = sum % BUCKETS;
+    const found = table[bucket].includes(key);
+    document.getElementById('hashEq').innerHTML =
+      `hash("<span class="em">${key}</span>") = ${sum} mod ${BUCKETS} = <span class="res">${bucket}</span>`;
+    document.getElementById('hashOp').textContent = `lookup("${key}")`;
+    const narr = document.getElementById('hashNarr');
+    if (found) {
+      narr.className = 'step-narration success';
+      narr.innerHTML = `<b>HIT</b> · key <b>${key}</b> found in bucket <b>${bucket}</b>.`;
+    } else {
+      narr.className = 'step-narration warn';
+      narr.innerHTML = `<b>MISS</b> · key <b>${key}</b> not in bucket <b>${bucket}</b>.`;
+    }
+    render(bucket, found ? key : null);
+  }
+
+  function render(activeBucket = -1, foundKey = null) {
+    const c = document.getElementById('hashBuckets');
+    let html = '';
+    for (let b = 0; b < BUCKETS; b++) {
+      const cls = ['bucket-row'];
+      if (b === activeBucket) cls.push(foundKey ? 'found' : 'active');
+      html += `<div class="bucket-label">bucket [${b}]</div>`;
+      html += `<div class="${cls.join(' ')}">${
+        table[b].map(k =>
+          `<span class="bucket-pill ${k === foundKey ? 'target' : ''}">${k}</span>`
+        ).join('') || '<span class="muted small" style="padding: 0 4px;">∅</span>'
+      }</div>`;
+    }
+    c.innerHTML = html;
+  }
+
+  let timer = null;
+  function auto() {
+    if (timer) { clearInterval(timer); timer = null; return; }
+    timer = setInterval(() => {
+      if (idx >= keys.length) { clearInterval(timer); timer = null; return; }
+      insertNext();
+    }, 600);
+  }
+
+  document.getElementById('hashStep').onclick = insertNext;
+  document.getElementById('hashAuto').onclick = auto;
+  document.getElementById('hashReset').onclick = reset;
+  document.getElementById('hashLookupBtn').onclick = lookup;
+  document.getElementById('hashData').addEventListener('input', () => { if (timer) clearInterval(timer); reset(); });
+
+  reset();
+  return { reset };
+})();
+
+/* ============================================================================
+   ALGORITHM 4 — Greedy (Grade Calculator)
+   ----------------------------------------------------------------------------
+   Walks grade targets in descending order; for each, computes the minimum
+   end-sem mark needed. This mirrors src/dsa/grade_optimizer.py.
+   ============================================================================ */
+const Greedy = (function () {
+  const TARGETS = [
+    { grade: 'O',  cutoff: 90 }, { grade: 'A+', cutoff: 80 },
+    { grade: 'A',  cutoff: 70 }, { grade: 'B+', cutoff: 60 },
+    { grade: 'B',  cutoff: 50 }, { grade: 'C',  cutoff: 40 },
+    { grade: 'P',  cutoff: 35 },
+  ];
+  const ENDSEM_W = 0.30;
+  let stepIdx = 0, decisions = [];
+
+  function earned() {
+    const m = Number(document.getElementById('g_mid').value)   || 0;
+    const q = Number(document.getElementById('g_quiz').value)  || 0;
+    const t = Number(document.getElementById('g_tests').value) || 0;
+    const c = Number(document.getElementById('g_class').value) || 0;
+    return m * 0.20 + q * 0.20 + t * 0.20 + c * 0.10;
+  }
+
+  function reset() {
+    stepIdx = 0;
+    decisions = [];
+    document.getElementById('greedyEarned').textContent = earned().toFixed(2);
+    document.getElementById('greedyConsidering').textContent = '—';
+    document.getElementById('greedyNarr').className = 'step-narration';
+    document.getElementById('greedyNarr').innerHTML =
+      `Earned <b>${earned().toFixed(2)}</b>/70 from internals + mid sem. Press <b>Allocate next grade ▸</b> to consider grade <b>O</b> (highest cutoff first).`;
+    render();
+  }
+
+  function step() {
+    if (stepIdx >= TARGETS.length) {
+      document.getElementById('greedyNarr').className = 'step-narration success';
+      document.getElementById('greedyNarr').innerHTML =
+        `Greedy walk complete — every grade target evaluated. The highest <b>feasible</b> target is the realistic ceiling.`;
+      return;
+    }
+    const t = TARGETS[stepIdx++];
+    const e = earned();
+    const required = (t.cutoff - e) / ENDSEM_W;
+    let verdict;
+    if (required <= 0)        verdict = 'locked';
+    else if (required <= 100) verdict = 'feasible';
+    else                       verdict = 'impossible';
+
+    decisions.push({ ...t, required, verdict });
+    document.getElementById('greedyEarned').textContent = e.toFixed(2);
+    document.getElementById('greedyConsidering').textContent =
+      stepIdx < TARGETS.length ? TARGETS[stepIdx].grade : 'done';
+
+    const narr = document.getElementById('greedyNarr');
+    if (verdict === 'locked') {
+      narr.className = 'step-narration success';
+      narr.innerHTML = `Grade <b>${t.grade}</b>: already achieved (need ≤ 0% on End Sem).`;
+    } else if (verdict === 'feasible') {
+      narr.className = 'step-narration';
+      narr.innerHTML = `Grade <b>${t.grade}</b>: need <b>${required.toFixed(1)}%</b> on End Sem → feasible.`;
+    } else {
+      narr.className = 'step-narration warn';
+      narr.innerHTML = `Grade <b>${t.grade}</b>: need <b>${required.toFixed(1)}%</b> on End Sem → exceeds 100%, marked impossible.`;
+    }
+    render();
+  }
+
+  function render() {
+    const html = decisions.map(d => {
+      // Pick visual style per verdict.
+      // - locked     : full green bar (already achieved)
+      // - feasible   : blue→teal bar at the required %
+      // - impossible : full red bar at 100% (with overflow indicator in the label)
+      let fillCls, cls, txt;
+      if (d.verdict === 'locked') {
+        fillCls = 'cutoff'; cls = 'feasible'; txt = '✓ already locked';
+      } else if (d.verdict === 'feasible') {
+        fillCls = ''; cls = 'feasible'; txt = `${d.required.toFixed(1)}% needed`;
+      } else {
+        fillCls = 'impossible'; cls = 'impossible';
+        txt = `${d.required.toFixed(1)}% — N/A`;
+      }
+      // Bar width — clamp impossible at 100% so it visually pins at the max.
+      const w = d.verdict === 'locked' ? 100
+              : Math.min(100, Math.max(0, d.required));
+      const gradeColor = d.verdict === 'impossible' ? 'var(--risk-critical)' :
+                         d.verdict === 'locked'     ? 'var(--risk-safe)' :
+                                                      'var(--accent)';
+      return `
+        <div class="greedy-row">
+          <div class="greedy-grade-pill" style="color: ${gradeColor};">
+            ${d.grade}<span class="muted small" style="font-size: 11px; font-family: var(--font-mono);"> ≥ ${d.cutoff}</span>
+          </div>
+          <div class="greedy-bar-track">
+            <div class="greedy-bar-fill ${fillCls}" style="width: ${w}%;"></div>
+          </div>
+          <div class="greedy-stat ${cls}">${txt}</div>
+        </div>`;
+    }).join('');
+    document.getElementById('greedyList').innerHTML = html
+      || '<div class="empty-state small">No targets considered yet.</div>';
+  }
+
+  let timer = null;
+  function auto() {
+    if (timer) { clearInterval(timer); timer = null; return; }
+    timer = setInterval(() => {
+      if (stepIdx >= TARGETS.length) { clearInterval(timer); timer = null; return; }
+      step();
+    }, 700);
+  }
+
+  document.getElementById('greedyStep').onclick = step;
+  document.getElementById('greedyAuto').onclick = auto;
+  document.getElementById('greedyReset').onclick = reset;
+  ['g_mid', 'g_quiz', 'g_tests', 'g_class'].forEach(id =>
+    document.getElementById(id).addEventListener('input', () => {
+      if (timer) clearInterval(timer);
+      reset();
+    })
+  );
+
+  reset();
+  return { reset };
+})();
+
+/* ============================================================================
+   Tab switching
+   ============================================================================ */
+document.querySelectorAll('.algo-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.algo-tab').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.algo-panel').forEach(p =>
+      p.classList.toggle('active', p.dataset.panel === target));
+  });
+});
+</script>
+</body>
+</html>
